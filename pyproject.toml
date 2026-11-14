@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ctf-boilerplate"
+version = "0.1.0"
+description = "Generate starter solve scripts for CTF challenges"
+requires-python = ">=3.12"
+dependencies = ["typer>=0.12"]
+
+[project.scripts]
+ctf-boilerplate = "ctf_boilerplate.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
