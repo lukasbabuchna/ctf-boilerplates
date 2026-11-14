@@ -1,0 +1,175 @@
+#!/usr/bin/env python3
+"""Generate a starter solve script for a CTF category."""
+
+import argparse
+import os
+import sys
+from datetime import date
+from pathlib import Path
+
+CATEGORIES = ("pwn", "web", "crypto", "rev", "misc")
+
+TEMPLATES = {
+    "pwn": '''#!/usr/bin/env python3
+import os
+import re
+import struct
+import sys
+import time
+from pwn import *
+
+HOST = "challenge.example.com"   # remote host, leave empty for local
+PORT = 1337                      # remote port
+BINARY = "./chal"                # local binary, used when HOST is empty
+
+context.log_level = "debug"
+
+
+def conn():
+    return remote(HOST, PORT) if HOST else process(BINARY)
+
+
+p = conn()
+
+if os.path.exists(BINARY):
+    elf = context.binary = ELF(BINARY, checksec=False)
+''',
+    "web": '''#!/usr/bin/env python3
+import base64
+import json
+import re
+import urllib.parse
+
+import requests
+
+BASE_URL = "http://challenge.example.com"
+''',
+    "crypto": '''#!/usr/bin/env python3
+import base64
+import binascii
+import hashlib
+
+import gmpy2
+import sympy
+from Crypto.Util.number import *
+''',
+    "rev": '''#!/usr/bin/env python3
+import re
+import subprocess
+
+import capstone
+import elftools
+''',
+    "misc": '''#!/usr/bin/env python3
+import base64
+import binascii
+import re
+import zlib
+
+import PIL
+''',
+}
+
+
+def user_template_dir() -> Path:
+    """Template directory that shadows the embedded templates."""
+    config_home = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(config_home) if config_home else Path.home() / ".config"
+    return base / "ctf-boilerplate" / "templates"
+
+
+def load_template(category: str, template_dir: Path | None) -> str:
+    filename = f"{category}.py"
+    preferred = template_dir if template_dir is not None else user_template_dir()
+    path = preferred / filename
+    if path.is_file():
+        return path.read_text(encoding="utf-8")
+
+    if template_dir is not None:
+        raise FileNotFoundError(f"no {filename} in {template_dir}")
+
+    return TEMPLATES[category]
+
+
+def free_path(directory: Path, stem: str) -> Path:
+    candidate = directory / f"{stem}.py"
+    index = 1
+    while candidate.exists():
+        candidate = directory / f"{stem}{index}.py"
+        index += 1
+    return candidate
+
+
+def script_stem(name: str | None) -> str:
+    stem = name or "solve"
+    if stem.endswith(".py"):
+        stem = stem[: -len(".py")]
+    if not stem or stem in {".", ".."} or Path(stem).name != stem:
+        raise ValueError(f"name must be a bare filename stem, got {name!r}")
+    return stem
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="ctf-boilerplate",
+        description="Generate a starter solve script for a CTF category.",
+    )
+    parser.add_argument(
+        "category",
+        nargs="?",
+        help=f"challenge category: {', '.join(CATEGORIES)}",
+    )
+    parser.add_argument(
+        "--name",
+        "-n",
+        help="file stem to write instead of solve",
+    )
+    parser.add_argument(
+        "--template-dir",
+        help="directory to read templates from instead of the embedded ones",
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        dest="list_categories",
+        help="print the available categories and exit",
+    )
+    args = parser.parse_args(argv)
+
+    if args.list_categories:
+        for item in CATEGORIES:
+            print(item)
+        return 0
+
+    if args.category is None:
+        parser.error(f"missing category; choose one of: {', '.join(CATEGORIES)}")
+
+    if args.category not in CATEGORIES:
+        parser.error(
+            f"unknown category {args.category!r}; "
+            f"choose one of: {', '.join(CATEGORIES)}"
+        )
+
+    chosen_dir = (
+        Path(args.template_dir).expanduser() if args.template_dir is not None else None
+    )
+    try:
+        body = load_template(args.category, chosen_dir)
+    except FileNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 1
+
+    try:
+        stem = script_stem(args.name)
+    except ValueError as error:
+        parser.error(str(error))
+
+    path = free_path(Path.cwd(), stem)
+    header = f"# ctf-boilerplate: {args.category} — generated {date.today().isoformat()}\n"
+    path.write_text(header + body, encoding="utf-8")
+    print(os.path.relpath(path, Path.cwd()))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
