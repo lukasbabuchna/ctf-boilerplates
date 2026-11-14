@@ -75,7 +75,7 @@ def user_template_dir() -> Path:
     """Template directory that shadows the embedded templates."""
     config_home = os.environ.get("XDG_CONFIG_HOME")
     base = Path(config_home) if config_home else Path.home() / ".config"
-    return base / "ctf-boilerplate" / "templates"
+    return base / "ctf-boil" / "templates"
 
 
 def load_template(category: str, template_dir: Path | None) -> str:
@@ -111,7 +111,7 @@ def script_stem(name: str | None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="ctf-boilerplate",
+        prog="ctf-boil",
         description="Generate a starter solve script for a CTF category.",
     )
     parser.add_argument(
@@ -165,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(str(error))
 
     path = free_path(Path.cwd(), stem)
-    header = f"# ctf-boilerplate: {args.category} — generated {date.today().isoformat()}\n"
+    header = f"# ctf-boil: {args.category} — generated {date.today().isoformat()}\n"
     path.write_text(header + body, encoding="utf-8")
     print(os.path.relpath(path, Path.cwd()))
     return 0
